@@ -1,0 +1,68 @@
+import json
+import string
+
+import requests
+import time
+
+
+def fetch_data_for_prefix(prefix, start_page, max_pages=100):
+    """Fetches data for a given prefix across all pages."""
+    url = "https://www.1mg.com/pharmacy_api_gateway/v4/drug_skus/by_prefix?random"
+    page = start_page
+    filename = f"drug_data_{prefix}.json"
+    while page <= max_pages:
+
+        params = {
+            "prefix_term": prefix,
+            "page": page,
+            "per_page": 30
+        }
+
+        try:
+            # Make the GET request to the API
+            response = requests.get(url, params=params)
+
+            if response.status_code == 200:
+                data = response.json()
+                skus = data.get('data', [])
+                if not skus:
+                    break
+                drugs = skus.get('skus', [])
+
+                if not drugs:  # If no more data, break out of the loop
+                    break
+                with open(filename, 'a+') as f:
+                    for item in data:
+                        json_line = json.dumps(item)
+                        f.write(json_line + '\n')
+            elif response.status_code == 429:
+                page -= 1
+                print('got 429')
+                time.sleep(60)
+            else:
+                print(f"Failed to fetch data: HTTP {response.status_code} for prefix '{prefix}' on page {page}.")
+                break
+
+            page += 1
+            time.sleep(1)  # Delay to avoid throttling
+
+        except requests.exceptions.RequestException as e:
+            print(f"An error occurred: {e}")
+            break
+
+
+def fetch_all_data():
+    """Fetches data for all prefixes from 'a' to 'z'."""
+
+    for prefix in string.ascii_lowercase:  # Iterate through 'a' to 'z'
+        print(f"Fetching data for prefix '{prefix}'...")
+        fetch_data_for_prefix(prefix, 1, 2000)
+        time.sleep(2)
+
+
+def main():
+    fetch_all_data()
+
+
+if __name__ == "__main__":
+    main()
